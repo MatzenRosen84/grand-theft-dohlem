@@ -80,7 +80,7 @@ export class Game {
   async load() {
     // Progress for the loading bar: the building steps count for 40 %, the
     // model downloads for 60 % (phones skip those, so there the steps are everything).
-    const STEPS = 9
+    const STEPS = 10
     let step = 0
     let label = ''
     const bytes = new Map() // file -> [loaded, total]
@@ -177,6 +177,8 @@ export class Game {
     this.rig.goal.yaw = this.car.yaw
 
     this.stats = { buildings: buildings.count, trees: this.trees.count, roads: map.roads.length }
+    await say('Der Motor läuft warm')
+    await this.warmUp()
     await say('')
     return this.stats
   }
@@ -425,6 +427,27 @@ export class Game {
       }
     }
 
+    this.draw(dt)
+    if ((this.frameNo = (this.frameNo ?? 0) + 1) & 1) this.drawMinimap() // the radar is fine at half rate
+    this.hudTick(dt)
+  }
+
+  // The first picture is the expensive one: every shader gets compiled and
+  // every texture and mesh goes to the graphics card. Do that behind the
+  // loading screen, so the game does not hang after the click on start.
+  async warmUp() {
+    this.poseCar()
+    this.rig.update(1 / 60)
+    try {
+      await this.renderer.compileAsync?.(this.scene, this.camera)
+    } catch (err) {
+      console.warn('Shader konnten nicht vorab übersetzt werden:', err)
+    }
+    this.draw(1 / 60)
+  }
+
+  // one picture from where the camera is now
+  draw(dt) {
     this.trees.update(this.camera.position.x, this.camera.position.z)
     this.props.update(this.camera.position.x, this.camera.position.z, this.env.dark)
     this.placed.update(this.camera.position.x, this.camera.position.z)
@@ -444,8 +467,11 @@ export class Game {
       this.composer.render(dt)
     }
     else this.renderer.render(this.scene, this.camera)
-    if ((this.frameNo = (this.frameNo ?? 0) + 1) & 1) this.drawMinimap() // the radar is fine at half rate
+  }
 
+  // numbers for the dashboard, five times a second
+  hudTick(dt) {
+    const car = this.car
     this.frames++
     this.hudTimer += dt
     if (this.hudTimer >= 0.2) {
