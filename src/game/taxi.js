@@ -195,6 +195,7 @@ export class TaxiGame {
     for (const ev of this.population.events) {
       const fine = FINES[ev.type] ?? 0
       this.cash -= fine
+      if (fine) this.hooks.onSound?.('fine')
       const what = { person: 'Jemanden angefahren', dog: 'Hund angefahren', cat: 'Katze angefahren', car: 'In ein Auto gekracht' }[ev.type]
       this.toast(`${what}: −${fine} €`, 'bad')
       if (this.rider) this.rider.scares++
@@ -223,6 +224,7 @@ export class TaxiGame {
           c.person.wave = false
           this.hooks.onGuest?.(c.name, c.dest.line)
           this.hooks.onEvent?.('pickup')
+          this.hooks.onSound?.('pickup')
           break
         }
       }
@@ -288,6 +290,7 @@ export class TaxiGame {
     this.cash += total
     this.trips++
     this.hooks.onEvent?.('dropoff')
+    this.hooks.onSound?.('dropoff')
     const mood = r.scares > 1 ? 'Nie wieder!' : punctual > 0.7 ? 'Das ging ja flott, danke!' : punctual > 0 ? 'Danke.' : 'Das hat aber gedauert.'
     this.hooks.onGuest?.(r.name, mood)
     this.toast(`+${total.toFixed(2).replace('.', ',')} €${tip >= 0.5 ? ` (Trinkgeld ${tip.toFixed(2).replace('.', ',')} €)` : ''}`, 'good')

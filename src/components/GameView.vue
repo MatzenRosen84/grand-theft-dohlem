@@ -13,7 +13,7 @@ const loading = ref('Start')
 const loadShare = ref(0) // 0..1, for the loading bar
 const started = ref(false)
 const error = ref('')
-const hours = ref(20.5) // always sundown; there is no control for it
+const hours = ref(21) // always late evening, the sun just above the hills; there is no control for it
 const showHelp = ref(true)
 const driving = ref(true)
 const stats = ref(null)
@@ -388,12 +388,23 @@ onBeforeUnmount(() => {
 .view {
   position: fixed;
   inset: 0;
+  /* never more than Full HD: bigger screens show the game in the middle with a frame around it */
+  max-width: 1920px;
+  max-height: 1080px;
+  margin: auto;
   touch-action: none; /* no page scrolling or pinch zoom while playing */
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
   overflow: hidden;
   color: var(--paper);
   user-select: none;
+}
+/* the frame, in the style of the comic panels: ink, a red line, ink again, hard shadow */
+@media (min-width: 1960px), (min-height: 1120px) {
+  .view {
+    border-radius: 10px;
+    box-shadow: 0 0 0 4px var(--ink), 0 0 0 7px var(--hot), 0 0 0 11px var(--ink), 14px 16px 0 11px rgba(0, 0, 0, 0.55);
+  }
 }
 .scene {
   width: 100%;

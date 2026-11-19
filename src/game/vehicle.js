@@ -270,7 +270,7 @@ export class Vehicle {
   }
 
   collide() {
-    const { terrain, buildings, trunksNear, obstacles } = this.world
+    const { terrain, buildings, trunksNear, obstacles, solids = [] } = this.world
     const sin = Math.sin(this.yaw)
     const cos = Math.cos(this.yaw)
 
@@ -281,8 +281,8 @@ export class Vehicle {
       const lim = terrain.half - 14
       if (Math.abs(px) > lim) this.bounce(px, pz, -Math.sign(px), 0, Math.abs(px) - lim, 0.1)
       if (Math.abs(pz) > lim) this.bounce(px, pz, 0, -Math.sign(pz), Math.abs(pz) - lim, 0.1)
-      buildings.nearby(px, pz, (i) => {
-        const fp = buildings.footprints[i]
+      // pushes the car back out of a closed outline (a house, the raised pitch)
+      const wall = (fp) => {
         if (!inRing(fp, px, pz)) return false
         // nearest wall of that house
         let best = Infinity
@@ -305,7 +305,9 @@ export class Vehicle {
         const d = Math.sqrt(best)
         if (d > 1e-4 && d < 6) this.bounce(px, pz, (qx - px) / d, (qz - pz) / d, d, 0.12)
         return true
-      })
+      }
+      buildings.nearby(px, pz, (i) => wall(buildings.footprints[i]))
+      for (const fp of solids) wall(fp)
     }
 
     // tree trunks and other vehicles

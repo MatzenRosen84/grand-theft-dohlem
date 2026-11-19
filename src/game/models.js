@@ -209,6 +209,7 @@ export function placeModels({ models, map, terrain, graph, buildings, obstacles 
   // props light enough to be shoved by the car: kind -> rough radius in metres
   const LIGHT = { cone: 0.3, bin: 0.4, crate: 0.5, carton: 0.4, barrel: 0.45 }
   const movables = []
+  const solids = [] // closed outlines the car cannot enter: [x, z, x, z, ...]
 
   if (models.street) {
     const make = (name, height) => prop(models.street, name, height)
@@ -321,6 +322,12 @@ export function placeModels({ models, map, terrain, graph, buildings, obstacles 
       bank.receiveShadow = true
       wrap.add(bank)
       put(wrap, x, z, Math.atan2(-az, ax) + (longModel ? 0 : Math.PI / 2), top + 0.08)
+      // the bank is solid: its outline keeps the car from driving into or under the pitch
+      const hu = (Math.max(size.x, size.z) * s) / 2 + 0.6
+      const hv = (Math.min(size.x, size.z) * s) / 2 + 0.6
+      const ring = []
+      for (const [u, v] of [[-hu, -hv], [hu, -hv], [hu, hv], [-hu, hv]]) ring.push(x + u * ax - v * az, z + u * az + v * ax)
+      solids.push(ring)
       count.fields = (count.fields ?? 0) + 1
     }
   }
@@ -329,6 +336,7 @@ export function placeModels({ models, map, terrain, graph, buildings, obstacles 
     group,
     count,
     movables, // the props that can be knocked about
+    solids,
     update(x, z) {
       for (const tile of tiles.values()) tile.visible = Math.hypot(tile.userData.x - x, tile.userData.z - z) < RANGE
     },

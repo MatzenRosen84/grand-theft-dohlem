@@ -12,6 +12,7 @@ import { buildCar, CALIBRA, carLights } from './carModel.js'
 import { Population, loadPeople } from './actors.js'
 import { TaxiGame } from './taxi.js'
 import { createComposer, QUALITY } from './postfx.js'
+import { Sound } from './sound.js'
 import { Damage } from './damage.js'
 import { buildProps } from './props.js'
 import { loadModels, makeCalibra, placeModels } from './models.js'
@@ -152,7 +153,7 @@ export class Game {
     this.models = await modelsReady
     this.placed = placeModels({ models: this.models, map, terrain, graph: this.graph, buildings, obstacles: this.population.obstacles })
     this.scene.add(this.placed.group)
-    this.car = new Vehicle({ terrain, buildings, trunksNear: this.trees.trunksNear, obstacles: this.population.obstacles })
+    this.car = new Vehicle({ terrain, buildings, trunksNear: this.trees.trunksNear, obstacles: this.population.obstacles, solids: this.placed.solids })
     this.damage = new Damage(this.scene, terrain)
     this.newCar()
     this.toStart()
@@ -165,7 +166,7 @@ export class Game {
       population: this.population,
       car: this.car,
       map,
-      hooks: { onToast: (text, kind) => this.hooks.onToast?.(text, kind), onEvent: (kind) => this.say(kind), onSay: (text) => this.hooks.onSpeech?.(text), onGuest: (name, line) => this.hooks.onGuest?.(name, line) },
+      hooks: { onToast: (text, kind) => this.hooks.onToast?.(text, kind), onEvent: (kind) => this.say(kind), onSound: (kind) => this.sound?.ping(kind),onSay: (text) => this.hooks.onSpeech?.(text), onGuest: (name, line) => this.hooks.onGuest?.(name, line) },
     })
 
     this.taxi.addCustomerAt(this.firstSpot)
@@ -384,6 +385,12 @@ export class Game {
   start() {
     if (this.running) return
     this.running = true
+    // start() comes from the click on the splash screen, which is what lets the browser play sound
+    try {
+      this.sound ??= new Sound()
+    } catch (err) {
+      console.warn('Kein Ton:', err)
+    }
     this.clock.start()
     this.raf = requestAnimationFrame(this.tick)
   }
@@ -405,6 +412,7 @@ export class Game {
       this.taxi.update(dt)
     }
     this.poseCar()
+    this.sound?.update(dt, car, !!this.over)
 
     // chase camera: behind the direction of travel, so slides show
     const c = this.chase
@@ -659,6 +667,7 @@ export class Game {
     window.removeEventListener('resize', this.resize)
     window.removeEventListener('keydown', this.onKey)
     this.rig?.dispose()
+    this.sound?.dispose()
     this.scene.traverse((o) => {
       o.geometry?.dispose()
       for (const m of [].concat(o.material ?? [])) {
