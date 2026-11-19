@@ -56,12 +56,15 @@ const compact = ref(false)
 // as a whole to whatever screen it runs on, so nothing can drift into
 // anything else on a smaller or larger phone.
 const hudScale = ref(1)
+const upright = ref(false) // phone held in portrait
 const fit = () => {
   compact.value = touch || innerWidth < 900 || innerHeight < 520
+  upright.value = innerHeight > innerWidth
   hudScale.value = compact.value ? Math.min(1.5, Math.max(0.55, Math.min(innerWidth / 844, innerHeight / 390))) : 1
 }
 fit()
 window.addEventListener('resize', fit)
+window.addEventListener('orientationchange', fit)
 // graphics are fixed: medium everywhere, low on phones, which could not keep up otherwise
 const quality = lite ? 'low' : 'medium'
 
@@ -227,6 +230,7 @@ window.addEventListener('keydown', onIntroKey)
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onIntroKey)
   window.removeEventListener('resize', fit)
+  window.removeEventListener('orientationchange', fit)
   radio.dispose()
   game.value?.dispose()
 })
@@ -237,6 +241,13 @@ onBeforeUnmount(() => {
     <canvas ref="canvas" class="scene"></canvas>
 
     <SplashScreen v-if="!started" :status="loading" :ready="!loading && !error" :error="error" :name="driver" :best="best" @start="begin" />
+
+    <!-- upright phone: covers everything, splash screen included, until it is turned -->
+    <div v-if="touch && upright" class="turn">
+      <img :src="logo" alt="Grand Theft Dohlem" />
+      <span class="phone" aria-hidden="true"></span>
+      <p>Dreh dein Handy quer</p>
+    </div>
 
     <template v-else>
       <header class="title">
@@ -343,7 +354,6 @@ onBeforeUnmount(() => {
           <button class="btn hand" @pointerdown.prevent="press('Space', true)" @pointerup="press('Space', false)" @pointercancel="press('Space', false)" @pointerleave="press('Space', false)">Hand&shy;bremse</button>
         </div>
       </div>
-      <div v-if="touch" class="turn">Bitte das Handy quer halten</div>
 
       <div v-if="gameOver" class="over">
         <h2>{{ gameOver.reason === 'wreck' ? 'Totalschaden' : 'Feierabend' }}</h2>
@@ -1022,9 +1032,6 @@ kbd {
   border-radius: 50%;
   line-height: 1.05;
 }
-.turn {
-  display: none;
-}
 
 /* touch devices and small windows (.compact on the root): smaller HUD, nothing under the thumbs.
    Every HUD element is scaled by --hud, which the script sets from the screen size. */
@@ -1187,20 +1194,47 @@ kbd {
   padding: 1px 10px;
   font-size: 0.85rem;
 }
-/* upright phone: ask for landscape */
-@media (pointer: coarse) and (orientation: portrait) {
-  .turn {
-    position: absolute;
-    inset: 0;
-    z-index: 20;
-    display: grid;
-    place-items: center;
-    padding: 24px;
-    color: var(--gold);
-    background: var(--ink);
-    font-family: var(--comic);
-    font-size: 2rem;
-    text-align: center;
+/* upright phone: ask for landscape (rendered only while a touch device is held upright) */
+.turn {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px;
+  color: var(--gold);
+  background: linear-gradient(160deg, var(--dusk), var(--ink) 70%);
+  font-family: var(--comic);
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+.turn img {
+  width: min(62vw, 300px);
+}
+.turn p {
+  margin: 0;
+}
+/* a little phone that tips over onto its side */
+.turn .phone {
+  width: 54px;
+  height: 96px;
+  border: 5px solid var(--paper);
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px var(--hot), 5px 6px 0 var(--ink);
+  animation: tip 1.8s ease-in-out infinite;
+}
+@keyframes tip {
+  0%,
+  25% {
+    transform: rotate(0deg);
+  }
+  60%,
+  100% {
+    transform: rotate(-90deg);
   }
 }
 
@@ -1270,8 +1304,9 @@ kbd {
 
 @media (prefers-reduced-motion: reduce) {
   .talking .head,
-  .count span {
-    animation: none;
+  .count span,
+  .turn .phone {
+    animation: none !important;
   }
 }
 </style>
