@@ -436,7 +436,8 @@ export class Game {
       u.exposure.value = this.renderer.toneMappingExposure
       u.time.value = performance.now() / 1000
       u.focus.value = this.rig.now.dist
-      u.radius.value = 4.5 * this.renderer.getPixelRatio()
+      // once the resolution had to come down, the blur goes first: the card is struggling
+      u.radius.value = this.scale > 0 ? 0 : this.composer.blur * this.renderer.getPixelRatio()
       u.near.value = this.camera.near
       u.far.value = this.camera.far
       u.texel.value.set(1 / this.composer.readBuffer.width, 1 / this.composer.readBuffer.height)

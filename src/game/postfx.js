@@ -13,8 +13,8 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js'
 // 7 to 10 ms each, the combined last pass about 2 ms.
 export const QUALITY = {
   low: { pixelRatio: 1, shadow: 2048, post: false, people: 8, cars: 5 },
-  medium: { pixelRatio: 1.25, shadow: 4096, post: true, msaa: 0, taps: 10, glow: false, ao: false, people: 12, cars: 7 },
-  high: { pixelRatio: 2, shadow: 4096, post: true, msaa: 4, taps: 16, glow: true, ao: true, people: 16, cars: 9 },
+  medium: { pixelRatio: 1, shadow: 4096, post: true, msaa: 0, taps: 6, blur: 3, glow: false, ao: false, people: 12, cars: 7 },
+  high: { pixelRatio: 2, shadow: 4096, post: true, msaa: 4, taps: 16, blur: 4.5, glow: true, ao: true, people: 16, cars: 9 },
 }
 
 // The last pass does everything that only needs one look at the picture:
@@ -91,7 +91,8 @@ const Finish = {
       #else
         vec3 sum = texture2D( tDiffuse, vUv ).rgb;
       #endif
-      if ( c > 0.03 ) {
+      // less than half a pixel of blur is not worth the extra lookups
+      if ( c * radius > 0.5 ) {
         float total = 1.0;
         for ( int i = 0; i < TAPS; i ++ ) {
           float a = float( i ) * 2.39996;
@@ -140,9 +141,10 @@ export function createComposer(renderer, scene, camera, quality) {
   const defines = { TAPS: q.taps }
   if (!q.msaa) defines.FXAA = 1
   const finish = new ShaderPass({ ...Finish, defines })
-  finish.uniforms.radius.value = 4.5 * renderer.getPixelRatio()
+  finish.uniforms.radius.value = q.blur * renderer.getPixelRatio()
   composer.addPass(finish)
   composer.finish = finish
+  composer.blur = q.blur
   // the buffer the scene is drawn into; its depth feeds the depth of field
   composer.sceneDepth = () => composer.readBuffer.depthTexture
   return composer
