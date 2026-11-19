@@ -1,7 +1,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
-const props = defineProps({ status: String, ready: Boolean, error: String, name: String, best: Array })
+const props = defineProps({ status: String, ready: Boolean, error: String, progress: Number, name: String, best: Array })
 const emit = defineEmits(['start'])
 
 const cover = import.meta.env.BASE_URL + 'splash/cover.jpg'
@@ -38,11 +38,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <div class="line">
         <h2>Bestenliste</h2>
         <p v-if="error" class="error">{{ error }}</p>
-        <p v-else-if="!ready">{{ status }} …</p>
+        <p v-else-if="!ready" class="busy">{{ status }} …</p>
         <ol v-else-if="best?.length">
           <li v-for="(e, i) in best.slice(0, 3)" :key="e.id"><span>{{ i + 1 }}.</span><b>{{ e.name }}</b><em>{{ euro(e.cash) }}</em></li>
         </ol>
         <p v-else>5 Minuten Schicht. Wer die meisten Euro einfährt, steht hier oben.</p>
+      </div>
+      <!-- loading bar; gone once the game is ready -->
+      <div v-if="!ready && !error" class="load" role="progressbar" :aria-valuenow="Math.round((progress ?? 0) * 100)" aria-valuemin="0" aria-valuemax="100">
+        <i :style="{ width: Math.round((progress ?? 0) * 100) + '%' }"></i>
+        <span>{{ Math.round((progress ?? 0) * 100) }} %</span>
       </div>
     </form>
   </div>
@@ -119,6 +124,33 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   .desk input {
     width: 9em;
   }
+}
+.load {
+  position: relative;
+  height: 18px;
+  background: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 9px;
+  box-shadow: 0 0 0 2px var(--hot);
+  overflow: hidden;
+}
+.load i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--sun), var(--gold));
+  border-radius: 6px;
+  transition: width 0.25s;
+}
+.load span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--paper);
+  font-family: var(--comic);
+  font-size: 0.9em;
+  letter-spacing: 0.06em;
+  text-shadow: 0 1px 2px var(--ink), 0 0 3px var(--ink);
 }
 .desk .error {
   color: #ff9a8a;

@@ -10,6 +10,7 @@ const radar = ref(null)
 const game = shallowRef(null)
 
 const loading = ref('Start')
+const loadShare = ref(0) // 0..1, for the loading bar
 const started = ref(false)
 const error = ref('')
 const hours = ref(20.5) // always sundown; there is no control for it
@@ -146,7 +147,10 @@ onMounted(async () => {
   const g = new Game(
     canvas.value,
     {
-      onProgress: (text) => (loading.value = text),
+      onProgress: (text, share = 0) => {
+        loading.value = text
+        loadShare.value = Math.max(loadShare.value, share) // never runs backwards
+      },
       onHud: (data) => Object.assign(hud, data),
       onMode: (on) => (driving.value = on),
       onToast: toast,
@@ -240,7 +244,7 @@ onBeforeUnmount(() => {
   <div class="view" :class="{ compact }" :style="{ '--hud': hudScale }">
     <canvas ref="canvas" class="scene"></canvas>
 
-    <SplashScreen v-if="!started" :status="loading" :ready="!loading && !error" :error="error" :name="driver" :best="best" @start="begin" />
+    <SplashScreen v-if="!started" :status="loading" :ready="!loading && !error" :error="error" :progress="loadShare" :name="driver" :best="best" @start="begin" />
 
     <!-- upright phone: covers everything, splash screen included, until it is turned -->
     <div v-if="touch && upright" class="turn">

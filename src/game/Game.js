@@ -78,10 +78,42 @@ export class Game {
   }
 
   async load() {
+    // Progress for the loading bar: the building steps count for 40 %, the
+    // model downloads for 60 % (phones skip those, so there the steps are everything).
+    const STEPS = 9
+    let step = 0
+    let label = ''
+    const bytes = new Map() // file -> [loaded, total]
+    const report = () => {
+      let loaded = 0
+      let total = 0
+      for (const [l, t] of bytes.values()) {
+        loaded += l
+        total += t || l
+      }
+      const built = Math.min(1, step / STEPS)
+      const fetched = total ? loaded / total : this.lite ? 1 : 0
+      this.hooks.onProgress?.(label, this.lite ? built : built * 0.4 + fetched * 0.6)
+    }
     const say = async (text) => {
-      this.hooks.onProgress?.(text)
+      step++
+      label = text
+      report()
       await nextFrame()
     }
+    const onBytes = (file, loaded, total) => {
+      bytes.set(file, [loaded, total])
+      report()
+    }
+    // The big files start downloading now and arrive while the village is
+    // built, instead of one after the other at the end.
+    const peopleReady = this.lite
+      ? Promise.resolve(null)
+      : loadPeople(onBytes).catch((err) => {
+          console.warn('Figuren konnten nicht geladen werden, es bleiben die einfachen:', err)
+          return null
+        })
+    const modelsReady = loadModels(this.lite, onBytes)
     const q = QUALITY[this.quality]
 
     await say('Karte wird geladen')
@@ -111,16 +143,13 @@ export class Game {
 
     await say('Das Dorf wacht auf')
     await say('Die Leute kommen aus den Häusern')
-    const people = this.lite ? null : await loadPeople().catch((err) => {
-      console.warn('Figuren konnten nicht geladen werden, es bleiben die einfachen:', err)
-      return null
-    })
+    const people = await peopleReady
     this.population = new Population(this.scene, this.graph, terrain, { cars: q.cars, people: q.people, dogs: 0, cats: 0 }, people)
     this.peopleModels = people
     this.props = buildProps({ runs, terrain, buildings, graph: this.graph, obstacles: this.population.obstacles, roadFrom: towardsStreet(runs) })
     this.scene.add(this.props.group)
     await say('Der Calibra wird aus der Garage geholt')
-    this.models = await loadModels(this.lite)
+    this.models = await modelsReady
     this.placed = placeModels({ models: this.models, map, terrain, graph: this.graph, buildings, obstacles: this.population.obstacles })
     this.scene.add(this.placed.group)
     this.car = new Vehicle({ terrain, buildings, trunksNear: this.trees.trunksNear, obstacles: this.population.obstacles })

@@ -20,13 +20,14 @@ const mat = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.85 }
 const PEOPLE = { walk: 'Walking.fbx', dance: 'Locking Hip Hop Dance.fbx', wave: 'Waving.fbx' }
 
 // Resolves to { walk, dance, wave }, each { scene, clip, scale, lift }.
-export async function loadPeople() {
+// onBytes(file, loaded, total) is called while the files download
+export async function loadPeople(onBytes = () => {}) {
   const loader = new FBXLoader()
   const base = import.meta.env.BASE_URL + 'models/persons/'
   const out = {}
   await Promise.all(
     Object.entries(PEOPLE).map(async ([key, file]) => {
-      const scene = await loader.loadAsync(base + encodeURIComponent(file))
+      const scene = await loader.loadAsync(base + encodeURIComponent(file), (e) => onBytes(file, e.loaded, e.total))
       const clip = scene.animations[0]
       // keep the figure on the spot: the game moves it, so the hips must not walk off on their own
       for (const track of clip?.tracks ?? []) {

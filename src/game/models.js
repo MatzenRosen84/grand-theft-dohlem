@@ -11,7 +11,8 @@ const CHUNK = 128 // props are grouped in tiles and only drawn near the camera
 const RANGE = 190
 
 // lite: leave out the Calibra (25 MB, over 800,000 triangles); the built-in car is used instead
-export async function loadModels(lite = false) {
+// onBytes(file, loaded, total) is called while the files download
+export async function loadModels(lite = false, onBytes = () => {}) {
   const loader = new GLTFLoader()
   const base = import.meta.env.BASE_URL + 'models/'
   const out = {}
@@ -19,7 +20,7 @@ export async function loadModels(lite = false) {
     Object.entries(FILES).map(async ([key, file]) => {
       if (lite && key === 'calibra') return
       try {
-        out[key] = (await loader.loadAsync(base + file)).scene
+        out[key] = (await loader.loadAsync(base + file, (e) => onBytes(file, e.loaded, e.total))).scene
         out[key].updateMatrixWorld(true)
       } catch (err) {
         console.warn(`Modell ${file} nicht geladen:`, err)
