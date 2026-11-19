@@ -40,6 +40,8 @@ export class Damage {
     this.mesh = mesh
     this.level = 0
     this.cooldown = 0
+    this.stages = [25, 45, 60, 70] // damage levels at which a part comes off for certain
+    this.wheelGone = false
     for (const d of this.debris) this.scene.remove(d.mesh)
     this.debris.length = 0
     for (const p of this.puffs) {
@@ -54,7 +56,7 @@ export class Damage {
     const hit = car.hit
     if (!hit || hit.v < 3 || this.cooldown > 0 || this.level >= 100) return 0
     this.cooldown = 0.6
-    const added = clamp((hit.v - 2.5) * 2.4, 2, 34)
+    const added = clamp((hit.v - 3) * 1.3, 1, 18) // about ten solid crashes before the engine gives up
     this.level = Math.min(100, this.level + added)
 
     // where the hit landed, in the car's own frame (x right, z back)
@@ -66,6 +68,11 @@ export class Damage {
     const lz = -(dx * sin - dz * cos)
     this.dent(lx, lz, hit.v)
     if (hit.v > 5) this.shed(lx, lz, car)
+    while (this.stages.length && this.level >= this.stages[0]) {
+      this.stages.shift()
+      this.shed(lx, lz, car, true)
+    }
+    if (this.level >= 80 && !this.wheelGone) this.dropWheel(lx, lz, car)
     return added
   }
 
@@ -101,7 +108,7 @@ export class Damage {
   }
 
   // knock off the loose part closest to the impact
-  shed(lx, lz, car) {
+  shed(lx, lz, car, force = false) {
     const loose = this.mesh.userData.loose
     let best = -1
     let bd = 1.7
@@ -112,7 +119,7 @@ export class Damage {
         best = i
       }
     })
-    if (best < 0 && loose.length && Math.random() < 0.35) best = (Math.random() * loose.length) | 0
+    if (best < 0 && loose.length && (force || Math.random() < 0.35)) best = (Math.random() * loose.length) | 0
     if (best < 0) return
     const [part] = loose.splice(best, 1)
     this.scene.attach(part) // keeps its place in the world
@@ -124,6 +131,28 @@ export class Damage {
       vz: car.vz * 0.6 + (Math.random() - 0.5) * 4,
       spin: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(14),
       life: 30,
+    })
+  }
+
+  // the wheel nearest to the impact breaks off and bounces away; the car limps from then on
+  dropWheel(lx, lz, car) {
+    const wheels = this.mesh.userData.wheels
+    if (!wheels.length) return
+    this.wheelGone = true
+    let best = 0
+    wheels.forEach((w, i) => {
+      if (Math.hypot(w.pivot.position.x - lx, w.pivot.position.z - lz) < Math.hypot(wheels[best].pivot.position.x - lx, wheels[best].pivot.position.z - lz)) best = i
+    })
+    const [wheel] = wheels.splice(best, 1)
+    car.limp = { side: Math.sign(wheel.pivot.position.x) || 1, front: wheel.front }
+    this.scene.attach(wheel.pivot)
+    this.debris.push({
+      mesh: wheel.pivot,
+      vx: car.vx * 0.9 + Math.cos(car.yaw) * car.limp.side * 3,
+      vy: 3.5,
+      vz: car.vz * 0.9 + Math.sin(car.yaw) * car.limp.side * 3,
+      spin: new THREE.Vector3(9, 0, 2),
+      life: 40,
     })
   }
 

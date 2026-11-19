@@ -275,7 +275,7 @@ class Walker {
     this.mixer.update(dt)
     const target = this.state === 'down' ? 1 : 0
     this.fall += (target - this.fall) * (1 - Math.exp(-dt * 9))
-    this.mesh.position.set(this.x, terrain.heightAt(this.x, this.z) + 0.05 + this.fall * 0.15, this.z)
+    this.mesh.position.set(this.x, terrain.heightAt(this.x, this.z) + (this.lift ?? 0.08) + this.fall * 0.15, this.z)
     this.mesh.rotation.set(-this.fall * 1.45, -this.yaw, 0, 'YXZ')
   }
 
@@ -310,7 +310,7 @@ class Walker {
     // knocked over: tip onto the back, then get up again
     const target = this.state === 'down' ? 1 : 0
     this.fall += (target - this.fall) * (1 - Math.exp(-dt * 9))
-    this.mesh.position.set(this.x, terrain.heightAt(this.x, this.z) + 0.06 + this.fall * 0.12, this.z)
+    this.mesh.position.set(this.x, terrain.heightAt(this.x, this.z) + (this.lift ?? 0.08) + this.fall * 0.12, this.z)
     const sway = this.tipsy ? Math.sin(this.phase * 0.5) * 0.11 : 0
     this.mesh.rotation.set(-this.fall * 1.45, -this.yaw + sway * 0.6, sway, 'YXZ')
   }
@@ -523,8 +523,8 @@ export class Population {
     w.s = this.rand() * e.len
     w.side = this.rand() < 0.5 ? -1 : 1
     // animals keep further from the road, in the gardens
-    // people keep to the pavement or stroll along the edge of the road; animals go where they like
-    w.margin = w.role === 'dancer' ? 1.6 + this.rand() * 2.5 : w.kind === 'person' ? (this.rand() < 0.3 ? -0.8 : 1.1) : this.rand() * 4 - 1.8
+    // people keep to the pavement; animals go where they like
+    w.margin = w.role === 'dancer' ? 1.6 + this.rand() * 2.5 : w.kind === 'person' ? 1.1 : this.rand() * 4 - 1.8
     if (w.role === 'dancer') w.yaw = this.rand() * Math.PI * 2
     const p = this.pathPoint(w)
     w.x = p.x
@@ -588,14 +588,26 @@ export class Population {
       const ahead = dx * sinP - dz * cosP
       const aside = dx * cosP + dz * sinP
 
+      // sliding away from a bump
+      if (w.sore > 0) w.sore -= dt
+      if (w.pushX || w.pushZ) {
+        w.x += w.pushX * dt
+        w.z += w.pushZ * dt
+        const k = Math.exp(-dt * 6)
+        w.pushX *= k
+        w.pushZ *= k
+        if (Math.hypot(w.pushX, w.pushZ) < 0.1) w.pushX = w.pushZ = 0
+      }
+
       // run over?
       if (w.state !== 'down' && Math.abs(ahead) < 2.45 && Math.abs(aside) < 1.05) {
         if (pSpeed > 2.2) {
-          w.state = 'down'
-          w.timer = w.kind === 'person' ? 5 : 2.5
-          w.x += player.vx * 0.12 + cosP * Math.sign(aside || 1) * 0.8
-          w.z += player.vz * 0.12 + sinP * Math.sign(aside || 1) * 0.8
-          this.events.push({ type: w.kind, speed: pSpeed, scripted: w.scripted })
+          // bumped out of the way, to the side they were hit on; they stay on their feet
+          const out = Math.sign(aside || 1)
+          w.pushX = cosP * out * 6 + player.vx * 0.25
+          w.pushZ = sinP * out * 6 + player.vz * 0.25
+          if (!(w.sore > 0)) this.events.push({ type: w.kind, speed: pSpeed, scripted: w.scripted })
+          w.sore = 1.5 // one fine per bump, not one per frame
         } else if (!w.scripted) {
           // nudged at walking pace: step out of the way
           w.x += cosP * Math.sign(aside || 1) * dt * 2
@@ -657,6 +669,15 @@ export class Population {
           if (w.goal && w.walkTo(dt, w.goal.x, w.goal.z, w.pace)) w.goal = null
         }
         if (dist > 560 || (w.lost && dist > 120)) this.placeWalker(w, px, pz, 150, 420)
+      }
+      // The road surface lies about 17 cm above the bare ground, the pavement
+      // about 8 cm: stand on whichever is underfoot, judged by the distance to the middle of the road.
+      if (w.edge !== undefined) {
+        const e = g.edges[w.edge]
+        const a = g.nodes[e.a]
+        const b = g.nodes[e.b]
+        const off = Math.abs((w.x - a.x) * (b.z - a.z) - (w.z - a.z) * (b.x - a.x)) / e.len
+        w.lift = off < e.w / 2 ? 0.17 : off < e.w / 2 + 1.8 ? 0.08 : 0.03
       }
       const seen = Math.abs(w.x - view.x) + Math.abs(w.z - view.z) < 220
       if (seen) w.animate(dt, this.terrain)

@@ -114,7 +114,9 @@ export function makeCalibra(src) {
     const mesh = new THREE.Mesh(geo, o.material)
     mesh.castShadow = dim.z > 2.4 // the big body shells are enough for the shadow
     // small parts on the outside can be knocked off in a crash
-    if (Math.max(dim.x, dim.y, dim.z) < 0.8 && (Math.abs(mid.x) > 0.6 || Math.abs(mid.z) > 1.8)) {
+    const small = Math.max(dim.x, dim.y, dim.z) < 0.8 && (Math.abs(mid.x) > 0.6 || Math.abs(mid.z) > 1.8)
+    const endPiece = Math.abs(mid.z) > 1.75 && dim.y < 0.45 && dim.z < 0.9 // bumpers, lamps, grille
+    if (small || endPiece) {
       geo.translate(-mid.x, -mid.y, -mid.z)
       mesh.position.copy(mid)
       mesh.userData.loose = true
@@ -203,6 +205,9 @@ export function placeModels({ models, map, terrain, graph, buildings, obstacles 
   }
   const insideHouse = (x, z) => buildings.nearby(x, z, (i) => inRing(buildings.footprints[i], x, z))
   const count = {}
+  // props light enough to be shoved by the car: kind -> rough radius in metres
+  const LIGHT = { cone: 0.3, bin: 0.4, crate: 0.5, carton: 0.4, barrel: 0.45 }
+  const movables = []
 
   if (models.street) {
     const make = (name, height) => prop(models.street, name, height)
@@ -212,7 +217,9 @@ export function placeModels({ models, map, terrain, graph, buildings, obstacles 
     }
     const add = (key, x, z, rot) => {
       if (!kit[key] || !terrain.contains(x, z, 6) || insideHouse(x, z)) return false
-      put(kit[key].clone(), x, z, rot)
+      const object = kit[key].clone()
+      put(object, x, z, rot)
+      if (LIGHT[key]) movables.push({ o: object, r: LIGHT[key], vx: 0, vz: 0, spin: 0, tip: 0, tips: key !== 'crate' && key !== 'carton' })
       count[key] = (count[key] ?? 0) + 1
       return true
     }
@@ -277,12 +284,13 @@ export function placeModels({ models, map, terrain, graph, buildings, obstacles 
           az = (p[j + 1] - p[i + 1]) / len
         }
       }
-      let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity, top = -Infinity
+      let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity, top = -Infinity, low = Infinity
       for (let i = 0; i < p.length; i += 2) {
         const u = p[i] * ax + p[i + 1] * az
         const v = -p[i] * az + p[i + 1] * ax
         minU = Math.min(minU, u); maxU = Math.max(maxU, u); minV = Math.min(minV, v); maxV = Math.max(maxV, v)
         top = Math.max(top, terrain.heightAt(p[i], p[i + 1]))
+        low = Math.min(low, terrain.heightAt(p[i], p[i + 1]))
       }
       const cu = (minU + maxU) / 2
       const cv = (minV + maxV) / 2
@@ -299,7 +307,19 @@ export function placeModels({ models, map, terrain, graph, buildings, obstacles 
       holder.traverse((o) => {
         if (o.isMesh) o.receiveShadow = true
       })
-      put(holder, x, z, Math.atan2(-az, ax) + (longModel ? 0 : Math.PI / 2), top + 0.08)
+      // The ground slopes, the pitch does not: it sits level at the height of
+      // its highest corner on an earth bank that reaches down past the lowest.
+      const wrap = new THREE.Group()
+      wrap.add(holder)
+      const depth = top - low + 1.5
+      const bank = new THREE.Mesh(
+        new THREE.BoxGeometry(size.x * s + 1.2, depth, size.z * s + 1.2),
+        new THREE.MeshLambertMaterial({ color: 0x5a6b3c }),
+      )
+      bank.position.y = -depth / 2 - 0.03
+      bank.receiveShadow = true
+      wrap.add(bank)
+      put(wrap, x, z, Math.atan2(-az, ax) + (longModel ? 0 : Math.PI / 2), top + 0.08)
       count.fields = (count.fields ?? 0) + 1
     }
   }
@@ -307,8 +327,53 @@ export function placeModels({ models, map, terrain, graph, buildings, obstacles 
   return {
     group,
     count,
+    movables, // the props that can be knocked about
     update(x, z) {
       for (const tile of tiles.values()) tile.visible = Math.hypot(tile.userData.x - x, tile.userData.z - z) < RANGE
+    },
+    // light props get knocked away by the car, slide, tip over and come to rest
+    step(dt, car) {
+      const sin = Math.sin(car.yaw)
+      const cos = Math.cos(car.yaw)
+      for (const m of movables) {
+        const p = m.o.position
+        const dx = p.x - car.x
+        const dz = p.z - car.z
+        if (Math.abs(dx) < 4 && Math.abs(dz) < 4 && car.speed > 0.5) {
+          const ahead = dx * sin - dz * cos
+          const aside = dx * cos + dz * sin
+          if (Math.abs(ahead) < 2.3 + m.r && Math.abs(aside) < 0.9 + m.r) {
+            // off it goes: a bit faster than the car and out to the side it was hit on
+            const out = Math.sign(aside || 1)
+            m.vx = car.vx * 1.15 + cos * out * 1.6
+            m.vz = car.vz * 1.15 + sin * out * 1.6
+            m.spin = (Math.random() - 0.5) * 9
+            car.vx *= 0.985 // costs the car next to nothing
+            car.vz *= 0.985
+          }
+        }
+        const v = Math.hypot(m.vx, m.vz)
+        if (v < 0.05) continue
+        const nx = p.x + m.vx * dt
+        const nz = p.z + m.vz * dt
+        if (insideHouse(nx, nz) || !terrain.contains(nx, nz, 8)) {
+          m.vx *= -0.3 // bounces off the wall
+          m.vz *= -0.3
+        } else {
+          p.x = nx
+          p.z = nz
+        }
+        p.y = terrain.heightAt(p.x, p.z)
+        const k = Math.exp(-dt * 2.2)
+        m.vx *= k
+        m.vz *= k
+        m.spin *= k
+        m.o.rotation.y += m.spin * dt
+        if (m.tips) {
+          m.tip = Math.min(1.45, m.tip + v * dt * 0.9)
+          m.o.rotation.z = m.tip
+        }
+      }
     },
   }
 }

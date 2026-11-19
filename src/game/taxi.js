@@ -195,7 +195,7 @@ export class TaxiGame {
     for (const ev of this.population.events) {
       const fine = FINES[ev.type] ?? 0
       this.cash -= fine
-      const what = { person: 'Jemanden umgefahren', dog: 'Hund angefahren', cat: 'Katze angefahren', car: 'In ein Auto gekracht' }[ev.type]
+      const what = { person: 'Jemanden angefahren', dog: 'Hund angefahren', cat: 'Katze angefahren', car: 'In ein Auto gekracht' }[ev.type]
       this.toast(`${what}: −${fine} €`, 'bad')
       if (this.rider) this.rider.scares++
     }

@@ -271,6 +271,7 @@ export class Game {
     this.damage.reset(this.carMesh)
     this.car.power = 1
     this.car.dead = false
+    this.car.limp = null
     this.over = false
     this.shift = SHIFT
   }
@@ -369,6 +370,7 @@ export class Game {
     this.population.update(dt, car, this.rig.target)
     if (live) {
       this.crashes(dt)
+      this.placed.step(dt, car)
       this.taxi.update(dt)
     }
     this.poseCar()
@@ -468,7 +470,9 @@ export class Game {
     m.position.set(car.x, car.y, car.z)
     m.rotation.set(car.pitch, -car.yaw, car.roll)
     const { wheels, tail, body } = m.userData
-    body.rotation.set(car.dive, 0, car.lean)
+    // with a wheel gone the body sags onto that corner
+    const sag = car.limp ? 0.05 : 0
+    body.rotation.set(car.dive + (car.limp ? (car.limp.front ? -sag : sag) * 0.6 : 0), 0, car.lean - (car.limp ? car.limp.side * sag : 0))
     for (const w of wheels) {
       w.spinner.rotation.x = -car.wheelSpin
       if (w.front) w.pivot.rotation.y = -car.steer

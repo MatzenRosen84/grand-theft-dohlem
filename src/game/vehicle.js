@@ -21,9 +21,10 @@ const REVERSE = 3.33
 const FINAL = 3.72
 const IDLE = 900
 const REDLINE = 6800
-const PEAK_TORQUE = 196 // Nm at 4800 rpm
+const PEAK_TORQUE = 160 // Nm; the real car has 196, toned down so the village stays drivable
+const TOP_SPEED = 31 // m/s, about 110 km/h: the engine fades out towards it
 const DRIVELINE = 0.9
-const BRAKE_FORCE = 14500 // N, all four wheels
+const BRAKE_FORCE = 18000 // N, all four wheels
 const DRAG = 0.3 // 0.5 * rho * cd * A
 const MAX_LOCK = 0.6 // rad at the front wheels
 const SUBSTEP = 1 / 240
@@ -73,6 +74,7 @@ export class Vehicle {
     this.braking = false
     this.power = 1 // engine health, 1 = sound
     this.dead = false // engine gone for good
+    this.limp = null // { side, front } once a wheel has come off
     this.hit = null // hardest contact this frame: { x, z, v }
   }
 
@@ -113,6 +115,8 @@ export class Vehicle {
     this.steerIn = ease(this.steerIn, turn, rate, rate)
     const lock = MAX_LOCK / (1 + (this.speed / 13) ** 2)
     this.steer = this.steerIn * Math.max(lock, 0.035)
+    // on three wheels the car drags towards the bare corner
+    if (this.limp) this.steer += this.limp.side * 0.045 * Math.min(1, this.speed / 6)
     this.braking = this.brake > 0.1 || this.handbrake
 
     this.impact = 0
@@ -130,7 +134,7 @@ export class Vehicle {
     const w = this.spinRate
     const speed = Math.hypot(vf, vr)
     const onRoad = this.world.terrain.nearRoad(this.x, this.z)
-    const mu = this.airborne ? 0 : onRoad ? 1.0 : 0.58
+    const mu = this.airborne ? 0 : onRoad ? 1.3 : 0.75 // stickier than real tyres, to forgive late braking
     const rolling = onRoad ? 0.014 : 0.075
 
     // weight shifts to the rear under power and to the front under braking
@@ -150,7 +154,7 @@ export class Vehicle {
       else if (prev && prev < 3000 + this.throttle * 2200) (this.gear--, (this.shift = 0.18))
     }
     let torque = 0
-    if (this.shift <= 0 && rpm < REDLINE) torque = torqueAt(rpm) * this.throttle * this.power
+    if (this.shift <= 0 && rpm < REDLINE) torque = torqueAt(rpm) * this.throttle * this.power * clamp((TOP_SPEED - speed) / 6, 0, 1) * (this.limp ? 0.7 : 1)
     if (this.throttle < 0.05) torque -= 28 * (rpm / REDLINE) // engine braking
     this.rpm += (Math.min(rpm, REDLINE) - this.rpm) * Math.min(1, h * 14)
 
@@ -179,7 +183,8 @@ export class Vehicle {
     // a tyre that is already braking or pulling hard has less left for cornering
     const share = (long, grip) => (grip > 0 ? Math.sqrt(Math.max(0.05, 1 - (long / grip) ** 2)) : 0)
     const sideF = -tyre(alphaF) * gripF * share(longF, gripF)
-    const sideR = -tyre(alphaR) * gripR * share(longR, gripR) * (this.handbrake ? 0.4 : 1)
+    // a little extra hold at the rear keeps the tail from stepping out unless the handbrake is pulled
+    const sideR = -tyre(alphaR) * gripR * share(longR, gripR) * (this.handbrake ? 0.4 : 1.2)
 
     // --- sum up in the car's frame
     let forceF = longF * cs - sideF * sn + longR
@@ -199,7 +204,7 @@ export class Vehicle {
     const vfOld = vf
     vf += ax * h
     vr += ay * h
-    let spin = w + (turnMoment / INERTIA) * h
+    let spin = (w + (turnMoment / INERTIA) * h) * (1 - Math.min(1, h * 0.9)) // damped, so it settles quickly after a turn
 
     // brakes stop the car, they don't push it backwards
     if ((this.brake > 0 || this.handbrake) && vfOld * vf < 0) vf = 0

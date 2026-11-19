@@ -33,18 +33,10 @@ radio.load()
 const intro = ref('') // 'story', then '3', '2', '1', 'Los!', then '' while playing
 const guest = ref(null) // { name, line } while a passenger is talking
 const gameOver = ref(null)
-const QUALITY_NAMES = { low: 'niedrig', medium: 'mittel', high: 'hoch' }
 const cover = import.meta.env.BASE_URL + 'splash/cover.jpg'
 const guestIcon = import.meta.env.BASE_URL + 'splash/guest.jpg'
 const logo = import.meta.env.BASE_URL + 'splash/logo.png'
 
-const stored = (() => {
-  try {
-    return localStorage.getItem('quality')
-  } catch {
-    return null
-  }
-})()
 // touch devices get an on-screen stick; phones also start on low graphics without the heavy models
 // (?touch in the address forces the touch controls on, for trying them with a mouse)
 const touch = matchMedia('(pointer: coarse)').matches || new URLSearchParams(location.search).has('touch')
@@ -54,7 +46,8 @@ const compact = ref(false)
 const fit = () => (compact.value = touch || innerWidth < 900 || innerHeight < 520)
 fit()
 window.addEventListener('resize', fit)
-const quality = ref(['low', 'medium', 'high'].includes(stored) ? stored : lite ? 'low' : 'medium')
+// graphics are fixed: medium everywhere, low on phones, which could not keep up otherwise
+const quality = lite ? 'low' : 'medium'
 
 // The stick presses the same keys the keyboard would: up is gas, down is
 // brake and reverse, left and right steer.
@@ -99,16 +92,6 @@ const metres = (m) => (m >= 1000 ? (m / 1000).toLocaleString('de-DE', { maximumF
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
 watch(hours, (h) => game.value?.setTime(Number(h)))
-
-// the renderer is set up once, so a new quality level needs a fresh start
-function setQuality(q) {
-  try {
-    localStorage.setItem('quality', q)
-  } catch {
-    /* private mode: the choice just won't be remembered */
-  }
-  location.reload()
-}
 
 // what the driver says, shown in a bubble over the car for a moment
 let speechTimer = 0
@@ -157,7 +140,7 @@ onMounted(async () => {
         gameOver.value = { ...result, rank }
       },
     },
-    quality.value,
+    quality,
     { lite },
   )
   game.value = g
@@ -233,13 +216,6 @@ onBeforeUnmount(() => {
         <div class="cash" :class="{ debt: hud.taxi.cash < 0 }">{{ euro(hud.taxi.cash) }}</div>
         <div class="trips">{{ driver }} · {{ hud.taxi.trips }} {{ hud.taxi.trips === 1 ? 'Fahrt' : 'Fahrten' }}</div>
         <div class="shift" :class="{ late: hud.shift < 30 }">Schicht {{ mmss(hud.shift) }}</div>
-      </div>
-
-      <div class="panel box">
-        <div class="row">
-          <span>Grafik</span>
-          <button v-for="q in ['low', 'medium', 'high']" :key="q" :class="{ on: q === quality }" @click="setQuality(q)">{{ QUALITY_NAMES[q] }}</button>
-        </div>
       </div>
 
       <div v-if="showHelp" class="help box" @click="showHelp = false">
@@ -472,7 +448,7 @@ onBeforeUnmount(() => {
 
 .help {
   position: absolute;
-  top: 178px;
+  top: 128px;
   right: 22px;
   padding: 10px 14px;
   font-size: 0.8rem;
