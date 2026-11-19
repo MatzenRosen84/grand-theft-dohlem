@@ -40,10 +40,26 @@ const logo = import.meta.env.BASE_URL + 'splash/logo.png'
 // touch devices get an on-screen stick; phones also start on low graphics without the heavy models
 // (?touch in the address forces the touch controls on, for trying them with a mouse)
 const touch = matchMedia('(pointer: coarse)').matches || new URLSearchParams(location.search).has('touch')
-const lite = touch && Math.min(screen.width, screen.height) < 820
+// lite: low graphics and the simple built-in models. Phones always; other
+// machines once the game has found them too slow (remembered in the browser).
+const tooSlow = (() => {
+  try {
+    return localStorage.getItem('lite') === '1'
+  } catch {
+    return false
+  }
+})()
+const lite = tooSlow || (touch && Math.min(screen.width, screen.height) < 820)
 // small HUD for touch devices and small windows
 const compact = ref(false)
-const fit = () => (compact.value = touch || innerWidth < 900 || innerHeight < 520)
+// The small layout is drawn for a phone held sideways (844 x 390) and scaled
+// as a whole to whatever screen it runs on, so nothing can drift into
+// anything else on a smaller or larger phone.
+const hudScale = ref(1)
+const fit = () => {
+  compact.value = touch || innerWidth < 900 || innerHeight < 520
+  hudScale.value = compact.value ? Math.min(1.5, Math.max(0.55, Math.min(innerWidth / 844, innerHeight / 390))) : 1
+}
 fit()
 window.addEventListener('resize', fit)
 // graphics are fixed: medium everywhere, low on phones, which could not keep up otherwise
@@ -66,8 +82,8 @@ function stickMove(e) {
     dx *= max / len
     dy *= max / len
   }
-  knob.x = dx
-  knob.y = dy
+  knob.x = dx / hudScale.value // the stick itself is drawn scaled
+  knob.y = dy / hudScale.value
   press('KeyA', dx < -max * 0.3)
   press('KeyD', dx > max * 0.3)
   press('KeyW', dy < -max * 0.3)
@@ -132,6 +148,14 @@ onMounted(async () => {
       onMode: (on) => (driving.value = on),
       onToast: toast,
       onSpeech: say,
+      onSlow: () => {
+        try {
+          localStorage.setItem('lite', '1')
+        } catch {
+          /* not remembered */
+        }
+        toast('Die Grafikkarte kommt nicht mit. Ab dem nächsten Start läuft das Spiel mit einfacherer Grafik.', 'bad')
+      },
       onGuest: guestSays,
       onGameOver: (result) => {
         // into the best list, then show where that put the driver
@@ -161,6 +185,14 @@ function begin(name) {
   driver.value = name
   saveName(name)
   started.value = true
+  // phones: fill the whole screen and stay in landscape, where the browser allows it
+  if (touch) {
+    const root = document.documentElement
+    const full = root.requestFullscreen?.bind(root) ?? root.webkitRequestFullscreen?.bind(root)
+    Promise.resolve(full?.())
+      .then(() => screen.orientation?.lock?.('landscape'))
+      .catch(() => {})
+  }
   game.value.frozen = true
   game.value.start()
   intro.value = 'story'
@@ -201,7 +233,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="view" :class="{ compact }">
+  <div class="view" :class="{ compact }" :style="{ '--hud': hudScale }">
     <canvas ref="canvas" class="scene"></canvas>
 
     <SplashScreen v-if="!started" :status="loading" :ready="!loading && !error" :error="error" :name="driver" :best="best" @start="begin" />
@@ -342,6 +374,9 @@ onBeforeUnmount(() => {
 .view {
   position: fixed;
   inset: 0;
+  touch-action: none; /* no page scrolling or pinch zoom while playing */
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   overflow: hidden;
   color: var(--paper);
   user-select: none;
@@ -991,7 +1026,11 @@ kbd {
   display: none;
 }
 
-/* touch devices and small windows (.compact on the root): smaller HUD, nothing under the thumbs */
+/* touch devices and small windows (.compact on the root): smaller HUD, nothing under the thumbs.
+   Every HUD element is scaled by --hud, which the script sets from the screen size. */
+.compact > :not(.scene):not(.splash) {
+  zoom: var(--hud, 1);
+}
 .compact .help,
 .compact .panel,
 .compact .credits,

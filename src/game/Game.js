@@ -448,6 +448,14 @@ export class Game {
     p.ms += (dt * 1000 - p.ms) * 0.05
     p.since += dt
     p.hold -= dt
+    // Already at the lowest resolution and still far from smooth: this graphics
+    // card is too weak for the full game. Say so once; the next start is lighter.
+    const stuck = this.scale === this.scales.length - 1 && p.ms > 28
+    p.slow = stuck ? (p.slow ?? 0) + dt : 0
+    if (p.slow > 6 && !this.lite && !p.told) {
+      p.told = true
+      this.hooks.onSlow?.()
+    }
     if (p.since < 2) return // let the average settle after a change
     let next = this.scale
     if (p.ms > 18 && this.scale < this.scales.length - 1) {

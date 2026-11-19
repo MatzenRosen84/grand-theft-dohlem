@@ -1,0 +1,11 @@
+{
+  "name": "Grand Theft Dohlem",
+  "short_name": "GT Dohlem",
+  "start_url": ".",
+  "scope": ".",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b0916",
+  "theme_color": "#0b0916",
+  "icons": [{ "src": "splash/logo.png", "sizes": "640x564", "type": "image/png", "purpose": "any" }]
+}

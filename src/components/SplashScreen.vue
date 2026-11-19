@@ -13,8 +13,8 @@ const euro = (v) => v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximu
 function start() {
   const name = driver.value.trim().slice(0, 16)
   if (!props.ready) return
-  if (!name) return field.value?.focus()
-  emit('start', name)
+  // no name typed (fiddly on a phone): drive as "Fahrer"
+  emit('start', name || 'Fahrer')
 }
 
 const onKey = (e) => {
