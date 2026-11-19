@@ -1,0 +1,79 @@
+@import '@fontsource/bowlby-one';
+@import '@fontsource/bangers';
+
+/* One look for splash screen and game, taken from the cover art:
+   black ink outlines, night-blue panels, sunset orange and red, white lettering. */
+:root {
+  --ink: #0b0916;
+  --night: #1a1638;
+  --dusk: #33286a;
+  --sun: #ff9a3c;
+  --hot: #ff4f4f;
+  --gold: #ffd21f;
+  --good: #7be06a;
+  --paper: #ffffff;
+  --display: 'Bowlby One', 'Arial Black', Impact, sans-serif;
+  --comic: Bangers, Impact, sans-serif;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ink);
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+}
+
+/* comic panel: night-blue box, thick ink outline, thin red line outside it, hard shadow */
+.box {
+  color: var(--paper);
+  background: linear-gradient(160deg, var(--dusk), var(--night) 70%);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  box-shadow: 0 0 0 2px var(--hot), 5px 6px 0 var(--ink);
+}
+
+/* lettering like the logo: white, inked outline, red edge */
+.logo-text {
+  color: var(--paper);
+  font-family: var(--display);
+  font-weight: 400;
+  text-transform: lowercase;
+  -webkit-text-stroke: 5px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 0 0 var(--ink), 3px 3px 0 var(--hot);
+}
+
+.btn {
+  padding: 0.25em 1em;
+  color: var(--ink);
+  background: linear-gradient(var(--gold), var(--sun));
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  box-shadow: 3px 4px 0 var(--ink);
+  font-family: var(--comic);
+  font-size: 1.4em;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+.btn:active:not(:disabled) {
+  transform: translate(2px, 3px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.btn:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--paper);
+  outline-offset: 2px;
+}
