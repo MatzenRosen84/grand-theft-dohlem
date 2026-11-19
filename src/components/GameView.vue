@@ -1092,26 +1092,50 @@ kbd {
   width: 58px;
   height: 58px;
 }
+/* the driver talks on the left, the passenger on the right; neither reaches the middle */
 .compact .speech {
-  padding: 6px 12px;
-  font-size: 1.05rem;
+  box-sizing: border-box;
+  max-width: 215px;
+  padding: 5px 10px;
+  font-size: 0.9rem;
+  line-height: 1.15;
   border-width: 3px;
+  border-radius: 14px;
+  box-shadow: 3px 4px 0 var(--ink);
 }
 .compact .guest-spot {
-  top: 44px;
+  top: 92px;
+  left: 57%;
+  right: 12px;
+  justify-content: flex-end;
 }
 .compact .guest {
-  margin-left: 60px;
-  padding: 12px 16px 8px 24px;
-  border-width: 4px;
+  max-width: 300px;
+  margin-left: 46px;
+  padding: 11px 12px 6px 18px;
+  border-width: 3px;
+  border-radius: 16px;
+  box-shadow: 0 0 0 2px var(--hot), 4px 5px 0 var(--ink);
+}
+.compact .guest b {
+  top: -13px;
+  left: 20px;
+  padding: 0 8px;
+  border-width: 3px;
+  font-size: 0.7rem;
+}
+.compact .guest::after {
+  display: none; /* no room for the tail */
 }
 .compact .guest p {
-  font-size: 1.05rem;
+  font-size: 0.82rem;
+  line-height: 1.15;
 }
 .compact .guest .face {
-  left: -62px;
-  width: 70px;
-  height: 70px;
+  left: -46px;
+  width: 52px;
+  height: 52px;
+  border-width: 3px;
 }
 .compact .job {
   left: 58%; /* a little right of centre, clear of the speedometer */
